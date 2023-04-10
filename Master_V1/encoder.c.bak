@@ -1,0 +1,86 @@
+/*
+ * encoder.c
+ *
+ *  Created on: Mar 27, 2023
+ *      Author: yallo
+ */
+
+
+
+
+#include <stdint.h>
+#include "inc/tm4c1294ncpdt.h" // CMSIS-Core
+#include "inc/hw_memmap.h" // Memory map of the device
+#include "inc/hw_qei.h" // QEI register definitions
+#include "inc/hw_types.h" // Common types (uint32_t, etc.)
+#include "driverlib/pin_map.h" // Pin names (GPIO_PA6_QEI0*)
+
+void QEI_Init(void)
+{
+    // Enable the QEI0 peripheral and wait for it to become ready
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_QEI0);
+    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_QEI0))
+    {
+    }
+
+    // Enable the GPIO port associated with QEI0 and wait for it to become ready
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOA))
+    {
+    }
+
+    // Configure the QEI0 pins (PA6, PA7) as QEI inputs
+    GPIOPinConfigure(GPIO_PA6_QEI0PHB);
+    GPIOPinConfigure(GPIO_PA7_QEI0PHA);
+    GPIOPinTypeQEI(GPIO_PORTA_BASE, GPIO_PIN_6 | GPIO_PIN_7);
+
+    // Configure the QEI0 module with a 2x resolution and enable it
+    QEIDisable(QEI0_BASE);
+    QEIConfigure(QEI0_BASE, QEI_CONFIG_CAPTURE_A_B | QEI_CONFIG_NO_RESET | QEI_CONFIG_QUADRATURE | QEI_CONFIG_NO_SWAP, 0xFFFFFFFF);
+    QEIEnable(QEI0_BASE);
+}
+
+int main(void)
+{
+    // Initialize the system clock and QEI module
+    SysCtlClockSet(SYSCTL_SYSDIV_1 | SYSCTL_USE_OSC | SYSCTL_OSC_MAIN | SYSCTL_XTAL_25MHZ);
+    QEI_Init();
+
+    // Enable QEI0 interrupts
+    QEIIntEnable(QEI0_BASE, QEI_INTTIMER | QEI_INTDIR | QEI_INTERROR);
+
+    // Enable interrupts globally
+    IntMasterEnable();
+
+    // Initialize variables for position, direction, and speed
+    int32_t position = 0;
+    int32_t last_position = 0;
+    int32_t direction = 1; // 1 = forward, -1 = backward
+    int32_t speed = 0;
+
+    // Loop forever, reading the QEI position, direction, and speed
+    while(1)
+    {
+        // Read the current position from the QEI module
+        position = QEIPositionGet(QEI0_BASE);
+
+        // Determine the direction of motion based on the change in position since the last loop iteration
+        if(position > last_position)
+        {
+            direction = 1;
+        }
+        else if(position < last_position)
+        {
+            direction = -1;
+        }
+
+        // Calculate the speed of the motor in revolutions per second (RPS)
+        speed = QEIVelocityGet(QEI0_BASE) / (float)QEIPulsePerRevGet(QEI0_BASE);
+
+        // Print the position, direction, and speed to the console
+        printf("Position: %ld, Direction: %ld, Speed: %ld RPS\n", position, direction, speed);
+
+        // Save the current position for the next loop iteration
+        last_position = position;
+    }
+}
