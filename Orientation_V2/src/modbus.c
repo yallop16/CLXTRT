@@ -1,0 +1,128 @@
+/*
+ * modbus.c
+ *
+ *  Created on: Dec 13, 2020
+ *      Author: Admin
+ */
+
+#include "modBus.h"
+
+
+void preTransmission()
+{
+    //MAX485_TX_ENABLE = 1;
+    //MAX485_RX_ENABLE = 1;
+}
+
+void postTransmission()
+{
+    //MAX485_TX_ENABLE = 0;
+    //MAX485_RX_ENABLE = 0;
+}
+
+void ModbusMaster_begin()
+{
+    _u8MBSlave = SlaveID;
+}
+
+uint8_t read_HoldingRegisters(uint16_t u16ReadAddress, uint16_t u16ReadQty)
+{
+    _u16ReadAddress = u16ReadAddress;
+    _u16ReadQty = u16ReadQty;
+    return ModbusMasterTransaction(ku8MBReadHoldingRegisters);
+}
+
+uint8_t test_writingRegisters(uint16_t u16ReadAddress, uint16_t u16ReadQty)
+{
+    _u16ReadAddress = u16ReadAddress;
+    _u16ReadQty = u16ReadQty;
+//    UARTprintf("MODBUS Write TESTING 2.0\n");
+    return ModbusMasterTransaction(ku8MBWriteSingleRegisters);
+}
+
+uint8_t ModbusMasterTransaction(uint8_t u8MBFunction)
+{
+    uint8_t u8ModbusADUSize = 0;
+    u8BytesLeft = 8;
+    u8MBStatus = ku8MBSuccess;
+//    char idf=1+'0';
+//    MAP_UARTCharPut(UART0_BASE, idf);
+    // assemble Modbus Request Application Data Unit
+    u8ModbusADU[u8ModbusADUSize++] = _u8MBSlave;
+    u8ModbusADU[u8ModbusADUSize++] = u8MBFunction;
+
+    u8ModbusADU[u8ModbusADUSize++] = _u16ReadAddress >> 8;
+    u8ModbusADU[u8ModbusADUSize++] = _u16ReadAddress;
+    u8ModbusADU[u8ModbusADUSize++] = _u16ReadQty >> 8;
+    u8ModbusADU[u8ModbusADUSize++] = _u16ReadQty;
+
+    // append CRC
+    u16CRC = 0xFFFF;
+    for (i = 0; i < u8ModbusADUSize; i++)
+    {
+        u16CRC = crc16_update(u16CRC, u8ModbusADU[i]);
+    }
+    u8ModbusADU[u8ModbusADUSize++] = u16CRC;
+    u8ModbusADU[u8ModbusADUSize++] = u16CRC >> 8;
+  //  u8ModbusADU[u8ModbusADUSize] = 0;
+
+ //   preTransmission();
+
+    for (i = 0; i < u8ModbusADUSize; i++)
+    {
+        //UART_send_char(u8ModbusADU[i]);
+        //
+        // Read the next character from the UART and write it back to the UART.
+        //
+
+//      MAP_UARTCharPut(UART0_BASE, (u8ModbusADU[i]+'0'));
+        MAP_UARTCharPut(UART0_BASE, u8ModbusADU[i]);
+
+    }
+
+    u8ModbusADUSize = 0;
+
+    //delay T3.5   END FRAME
+//    postTransmission();
+    // loop until we run out of time or bytes, or an error occurs
+    //TMR0 = 100;
+    //TMR0IE = 1;
+//    while (u8BytesLeft && !u8MBStatus)
+//    {
+//        //if (RCIF == 1) {
+//        u8ModbusADU2[u8ModbusADUSize++] = MAP_UARTCharGet(UART0_BASE);//UART_get_char();
+//        u8BytesLeft--;
+//        if (u8ModbusADUSize == 5)
+//        {
+//            u8BytesLeft = u8ModbusADU2[2];
+//        }
+//        //}
+//    }
+//    for (i = 0; i <u8ModbusADUSize ; i++)
+//    {
+//        //SoftUART_send_char(u8ModbusADU2[i]); // Display Received code via Terminal
+//    }
+    return u8MBStatus;
+}
+
+static uint16_t crc16_update(uint16_t crc, uint8_t a)
+{
+    int i;
+    crc ^= a;
+    for (i = 0; i < 8; ++i) {
+        if (crc & 1)
+            crc = (crc >> 1) ^ 0xA001;
+        else
+            crc = (crc >> 1);
+    }
+//    UARTprintf("MODBUS TESTING CRC.0\n");
+
+ //   UARTprintf(crc);
+//    MAP_UARTCharPut(UART0_BASE, crc);
+//    MAP_UARTCharPut(UART0_BASE, (crc+48));
+//    MAP_UARTCharPut(UART0_BASE, ((crc>>8)+'0'));
+    return crc;
+}
+
+
+
